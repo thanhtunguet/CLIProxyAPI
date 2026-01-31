@@ -54,3 +54,33 @@ func TestSanitizeOAuthModelAlias_AllowsMultipleAliasesForSameName(t *testing.T) 
 		}
 	}
 }
+
+
+func TestSanitizeOAuthModelAlias_AllowsMultipleNamesForSameAlias(t *testing.T) {
+	cfg := &Config{
+		OAuthModelAlias: map[string][]OAuthModelAlias{
+			"claude": {
+				{Name: "claude-sonnet-4", Alias: "claude-sonnet-latest"},
+				{Name: "claude-sonnet-4-20250514", Alias: "claude-sonnet-latest"},
+				{Name: "claude-sonnet-3-5", Alias: "claude-sonnet-latest"},
+			},
+		},
+	}
+
+	cfg.SanitizeOAuthModelAlias()
+
+	aliases := cfg.OAuthModelAlias["claude"]
+	expected := []OAuthModelAlias{
+		{Name: "claude-sonnet-4", Alias: "claude-sonnet-latest"},
+		{Name: "claude-sonnet-4-20250514", Alias: "claude-sonnet-latest"},
+		{Name: "claude-sonnet-3-5", Alias: "claude-sonnet-latest"},
+	}
+	if len(aliases) != len(expected) {
+		t.Fatalf("expected %d sanitized aliases, got %d", len(expected), len(aliases))
+	}
+	for i, exp := range expected {
+		if aliases[i].Name != exp.Name || aliases[i].Alias != exp.Alias {
+			t.Fatalf("expected alias %d to be name=%q alias=%q, got name=%q alias=%q", i, exp.Name, exp.Alias, aliases[i].Name, aliases[i].Alias)
+		}
+	}
+}
