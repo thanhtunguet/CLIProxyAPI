@@ -15,7 +15,7 @@ import (
 	"github.com/router-for-me/CLIProxyAPI/v6/internal/api"
 	"github.com/router-for-me/CLIProxyAPI/v6/internal/registry"
 	"github.com/router-for-me/CLIProxyAPI/v6/internal/runtime/executor"
-	_ "github.com/router-for-me/CLIProxyAPI/v6/internal/usage"
+	internalusage "github.com/router-for-me/CLIProxyAPI/v6/internal/usage"
 	"github.com/router-for-me/CLIProxyAPI/v6/internal/watcher"
 	"github.com/router-for-me/CLIProxyAPI/v6/internal/wsrelay"
 	sdkaccess "github.com/router-for-me/CLIProxyAPI/v6/sdk/access"
@@ -89,6 +89,9 @@ type Service struct {
 
 	// wsGateway manages websocket Gemini providers.
 	wsGateway *wsrelay.Manager
+
+	// usagePersistenceStop stops SQLite-backed usage persistence when enabled.
+	usagePersistenceStop func(context.Context) error
 }
 
 // RegisterUsagePlugin registers a usage plugin on the global usage manager.
@@ -438,6 +441,15 @@ func (s *Service) Run(ctx context.Context) error {
 	}
 
 	usage.StartDefault(ctx)
+	stopUsagePersistence, errUsagePersistence := internalusage.StartSQLitePersistence(
+		internalusage.GetRequestStatistics(),
+		s.cfg.UsageStatisticsSQLitePath,
+		time.Duration(s.cfg.UsageStatisticsSQLiteFlushIntervalSeconds)*time.Second,
+	)
+	if errUsagePersistence != nil {
+		return fmt.Errorf("cliproxy: failed to start usage sqlite persistence: %w", errUsagePersistence)
+	}
+	s.usagePersistenceStop = stopUsagePersistence
 
 	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer shutdownCancel()
@@ -680,6 +692,15 @@ func (s *Service) Shutdown(ctx context.Context) error {
 					shutdownErr = err
 				}
 			}
+		}
+		if s.usagePersistenceStop != nil {
+			if err := s.usagePersistenceStop(ctx); err != nil {
+				log.Errorf("failed to stop usage sqlite persistence: %v", err)
+				if shutdownErr == nil {
+					shutdownErr = err
+				}
+			}
+			s.usagePersistenceStop = nil
 		}
 
 		usage.StopDefault()

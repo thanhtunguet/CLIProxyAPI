@@ -63,6 +63,12 @@ type Config struct {
 
 	// UsageStatisticsEnabled toggles in-memory usage aggregation; when false, usage data is discarded.
 	UsageStatisticsEnabled bool `yaml:"usage-statistics-enabled" json:"usage-statistics-enabled"`
+	// UsageStatisticsSQLitePath stores usage statistics snapshots in SQLite when set.
+	// Empty disables SQLite persistence.
+	UsageStatisticsSQLitePath string `yaml:"usage-statistics-sqlite-path" json:"usage-statistics-sqlite-path"`
+	// UsageStatisticsSQLiteFlushIntervalSeconds controls periodic SQLite snapshot persistence.
+	// Values <= 0 use the default interval.
+	UsageStatisticsSQLiteFlushIntervalSeconds int `yaml:"usage-statistics-sqlite-flush-interval-seconds" json:"usage-statistics-sqlite-flush-interval-seconds"`
 
 	// DisableCooling disables quota cooldown scheduling when true.
 	DisableCooling bool `yaml:"disable-cooling" json:"disable-cooling"`
@@ -528,6 +534,8 @@ func LoadConfigOptional(configFile string, optional bool) (*Config, error) {
 	cfg.LogsMaxTotalSizeMB = 0
 	cfg.ErrorLogsMaxFiles = 10
 	cfg.UsageStatisticsEnabled = false
+	cfg.UsageStatisticsSQLitePath = ""
+	cfg.UsageStatisticsSQLiteFlushIntervalSeconds = 30
 	cfg.DisableCooling = false
 	cfg.Pprof.Enable = false
 	cfg.Pprof.Addr = DefaultPprofAddr
