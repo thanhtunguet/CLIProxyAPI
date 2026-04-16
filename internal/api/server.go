@@ -13,6 +13,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -320,7 +321,9 @@ func NewServer(cfg *config.Config, authManager *auth.Manager, accessManager *sdk
 // setupRoutes configures the API routes for the server.
 // It defines the endpoints and associates them with their respective handlers.
 func (s *Server) setupRoutes() {
-	apiswagger.RegisterRoutes(s.engine, s.currentPath)
+	if swaggerEnabledFromEnv() {
+		apiswagger.RegisterRoutes(s.engine, s.currentPath)
+	}
 
 	s.engine.GET("/healthz", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"status": "ok"})
@@ -429,6 +432,18 @@ func (s *Server) setupRoutes() {
 	})
 
 	// Management routes are registered lazily by registerManagementRoutes when a secret is configured.
+}
+
+func swaggerEnabledFromEnv() bool {
+	raw := strings.TrimSpace(os.Getenv("SWAGGER_ENABLED"))
+	if raw == "" {
+		return false
+	}
+	enabled, errParse := strconv.ParseBool(raw)
+	if errParse != nil {
+		return false
+	}
+	return enabled
 }
 
 // AttachWebsocketRoute registers a websocket upgrade handler on the primary Gin engine.
