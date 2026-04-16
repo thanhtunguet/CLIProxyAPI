@@ -57,7 +57,7 @@ func buildOpenAPIDoc(engine *gin.Engine, scanner *requestDTOScanner) map[string]
 			"version":     "v6",
 			"description": "Auto-generated from Gin routes and detected request DTOs.",
 		},
-		"servers": []map[string]any{{"url": "/"}},
+		"servers": []map[string]any{{"url": "http://localhost:8317"}},
 		"components": map[string]any{
 			"securitySchemes": map[string]any{
 				"BearerAuth": map[string]any{
