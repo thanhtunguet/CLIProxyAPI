@@ -1,4 +1,4 @@
-name: Native Linux ARM64 (latest release)
+name: Native Linux (latest release)
 
 on:
   workflow_dispatch:
@@ -10,7 +10,7 @@ permissions:
   contents: write
 
 concurrency:
-  group: native-linux-arm64-latest
+  group: native-linux-latest
   cancel-in-progress: false
 
 jobs:
@@ -31,37 +31,40 @@ jobs:
           go-version-file: go.mod
           cache: true
 
-      - name: Build linux/arm64
+      - name: Build linux/amd64 and linux/arm64
         env:
           CGO_ENABLED: "0"
           GOOS: linux
-          GOARCH: arm64
         run: |
+          set -euo pipefail
           short_commit=$(git rev-parse --short HEAD)
           build_date=$(date -u +%Y-%m-%dT%H:%M:%SZ)
-          go build -trimpath \
-            -ldflags="-s -w -X 'main.Version=latest' -X 'main.Commit=${short_commit}' -X 'main.BuildDate=${build_date}'" \
-            -o cli-proxy-api-linux-arm64 \
-            ./cmd/server
+          ldflags="-s -w -X 'main.Version=latest' -X 'main.Commit=${short_commit}' -X 'main.BuildDate=${build_date}'"
+          for goarch in amd64 arm64; do
+            GOARCH="${goarch}" go build -trimpath \
+              -ldflags="${ldflags}" \
+              -o "cli-proxy-api-linux-${goarch}" \
+              ./cmd/server
+          done
 
-      - name: Point latest tag at current commit and attach binary to release
+      - name: Point latest tag at current commit and attach binaries to release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git tag -fa latest -m "Rolling latest (linux/arm64 CI build)"
+          git tag -fa latest -m "Rolling latest (linux amd64/arm64 CI build)"
           git push origin "refs/tags/latest" --force
 
-          artifact="cli-proxy-api-linux-arm64"
+          artifacts=(cli-proxy-api-linux-amd64 cli-proxy-api-linux-arm64)
           if gh release view latest --repo "${GITHUB_REPOSITORY}" >/dev/null 2>&1; then
-            gh release upload latest "${artifact}" --repo "${GITHUB_REPOSITORY}" --clobber
+            gh release upload latest "${artifacts[@]}" --repo "${GITHUB_REPOSITORY}" --clobber
           else
             commit_url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/commit/${GITHUB_SHA}"
-            gh release create latest "${artifact}" \
+            gh release create latest "${artifacts[@]}" \
               --repo "${GITHUB_REPOSITORY}" \
               --title "latest" \
-              --notes "Rolling **linux/arm64** build from [\`${GITHUB_SHA:0:7}\`](${commit_url}). Versioned builds are published from git tags via GoReleaser." \
+              --notes "Rolling **linux/amd64** and **linux/arm64** builds from [\`${GITHUB_SHA:0:7}\`](${commit_url}). Versioned builds are published from git tags via GoReleaser." \
               --latest
           fi
