@@ -321,13 +321,19 @@ func NewServer(cfg *config.Config, authManager *auth.Manager, accessManager *sdk
 // setupRoutes configures the API routes for the server.
 // It defines the endpoints and associates them with their respective handlers.
 func (s *Server) setupRoutes() {
-	if swaggerEnabledFromEnv() {
+    if swaggerEnabledFromEnv() {
 		apiswagger.RegisterRoutes(s.engine, s.currentPath)
 	}
+	healthzHandler := func(c *gin.Context) {
+        if c.Request.Method == http.MethodHead {
+            c.Status(http.StatusOK)
+            return
+        }
 
-	s.engine.GET("/healthz", func(c *gin.Context) {
-		c.JSON(http.StatusOK, gin.H{"status": "ok"})
-	})
+        c.JSON(http.StatusOK, gin.H{"status": "ok"})
+    }
+	s.engine.GET("/healthz", healthzHandler)
+	s.engine.HEAD("/healthz", healthzHandler)
 
 	s.engine.GET("/management.html", s.serveManagementControlPanel)
 	openaiHandlers := openai.NewOpenAIAPIHandler(s.handlers)
