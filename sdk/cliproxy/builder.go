@@ -167,6 +167,14 @@ func (b *Builder) WithServerOptions(opts ...api.ServerOption) *Builder {
 	return b
 }
 
+// WithListenerReady configures a callback invoked when the HTTP listener starts accepting connections.
+func (b *Builder) WithListenerReady(fn func()) *Builder {
+	if fn != nil {
+		b.serverOptions = append(b.serverOptions, api.WithListenerReady(fn))
+	}
+	return b
+}
+
 // WithLocalManagementPassword configures a password that is only accepted from localhost management requests.
 func (b *Builder) WithLocalManagementPassword(password string) *Builder {
 	if password == "" {

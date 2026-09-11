@@ -27,6 +27,14 @@ type serverOptionConfig struct {
 	pluginHost            *pluginhost.Host
 	configReloadHook      func(context.Context, *config.Config)
 	exampleAPIKeySafeMode bool
+	onListenerReady       func()
+}
+
+// WithListenerReady registers a callback invoked when the HTTP listener is successfully established.
+func WithListenerReady(fn func()) ServerOption {
+	return func(cfg *serverOptionConfig) {
+		cfg.onListenerReady = fn
+	}
 }
 
 // ServerOption customises HTTP server construction.

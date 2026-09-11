@@ -103,6 +103,7 @@ type Server struct {
 
 	exampleAPIKeySafeModeEnabled bool
 	exampleAPIKeySafeModeActive  atomic.Bool
+	onListenerReady              func()
 }
 
 // NewServer creates and initializes a new API server instance.
@@ -178,6 +179,7 @@ func NewServer(cfg *config.Config, authManager *auth.Manager, accessManager *sdk
 		configFilePath:      configFilePath,
 		currentPath:         wd,
 		envManagementSecret: envManagementSecret,
+		onListenerReady:     optionState.onListenerReady,
 		wsRoutes:            make(map[string]struct{}),
 		pluginHost:          optionState.pluginHost,
 
@@ -305,6 +307,10 @@ func (s *Server) Start() error {
 	httpListener := newMuxListener(listener.Addr(), 1024)
 	s.muxBaseListener = listener
 	s.muxHTTPListener = httpListener
+
+	if s.onListenerReady != nil {
+		s.onListenerReady()
+	}
 
 	httpErrCh := make(chan error, 1)
 	acceptErrCh := make(chan error, 1)
