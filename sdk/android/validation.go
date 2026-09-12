@@ -4,7 +4,11 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"os"
+	"path/filepath"
 	"strings"
+
+	"gopkg.in/yaml.v3"
 )
 
 const (
@@ -61,13 +65,62 @@ func ValidateConfig(cfg BootstrapConfig) error {
 				break
 			}
 		}
+		if !hasKey && cfg.WorkspaceDir != "" {
+			hasKey = configHasAPIKeys(cfg.WorkspaceDir)
+		}
 		if !hasKey {
 			return errors.New("fail closed: non-loopback bind host requires at least one configured API key")
 		}
-		if strings.TrimSpace(cfg.ManagementSecret) == "" {
+
+		secret := strings.TrimSpace(cfg.ManagementSecret)
+		if secret == "" && cfg.WorkspaceDir != "" {
+			secret = configHasManagementSecret(cfg.WorkspaceDir)
+		}
+		if secret == "" {
 			return errors.New("fail closed: non-loopback bind host requires a management secret")
 		}
 	}
 
 	return nil
+}
+
+func configHasAPIKeys(workspaceDir string) bool {
+	configPath := filepath.Join(workspaceDir, configFileName)
+	data, err := os.ReadFile(configPath)
+	if err != nil {
+		data = DefaultConfigYAML
+	}
+	var parsed struct {
+		APIKeys []string `yaml:"api-keys"`
+	}
+	if err := yaml.Unmarshal(data, &parsed); err == nil {
+		for _, k := range parsed.APIKeys {
+			if strings.TrimSpace(k) != "" {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func configHasManagementSecret(workspaceDir string) string {
+	configPath := filepath.Join(workspaceDir, configFileName)
+	data, err := os.ReadFile(configPath)
+	if err != nil {
+		data = DefaultConfigYAML
+	}
+	var parsed struct {
+		RemoteManagement struct {
+			SecretKey string `yaml:"secret-key"`
+			Secret    string `yaml:"secret"`
+		} `yaml:"remote-management"`
+	}
+	if err := yaml.Unmarshal(data, &parsed); err == nil {
+		s := strings.TrimSpace(parsed.RemoteManagement.SecretKey)
+		if s == "" {
+			s = strings.TrimSpace(parsed.RemoteManagement.Secret)
+		}
+		return s
+	}
+	return ""
 }

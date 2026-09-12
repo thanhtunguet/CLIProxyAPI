@@ -1,6 +1,8 @@
 package android
 
 import (
+	"bytes"
+	_ "embed"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -16,6 +18,9 @@ const (
 	logsDirName    = "logs"
 	runtimeDirName = "runtime"
 )
+
+//go:embed default_config.yaml
+var DefaultConfigYAML []byte
 
 // EnsureWorkspace guarantees all required workspace subdirectories exist.
 func EnsureWorkspace(workspaceDir string) error {
@@ -54,37 +59,67 @@ func BootstrapConfigYAML(workspaceDir string, cfg BootstrapConfig) error {
 
 	authDir := filepath.Join(workspaceDir, authDirName)
 
-	initialData := map[string]any{
-		"port":     cfg.Port,
-		"host":     cfg.BindHost,
-		"auth-dir": authDir,
-		"remote-management": map[string]any{
-			"disable-control-panel":     false,
-			"disable-auto-update-panel": !cfg.AutoUpdatePanel,
-			"allow-remote":              cfg.ManagementAllowRemote,
-		},
+	var docNode yaml.Node
+	if len(DefaultConfigYAML) > 0 {
+		if err := yaml.Unmarshal(DefaultConfigYAML, &docNode); err != nil {
+			return fmt.Errorf("failed to parse default config template: %w", err)
+		}
+	}
+
+	if docNode.Kind != yaml.DocumentNode || len(docNode.Content) == 0 || docNode.Content[0].Kind != yaml.MappingNode {
+		// Create fresh document with root mapping
+		rootMap := &yaml.Node{Kind: yaml.MappingNode, Tag: "!!map"}
+		docNode = yaml.Node{
+			Kind:    yaml.DocumentNode,
+			Content: []*yaml.Node{rootMap},
+		}
+	}
+	rootMap := docNode.Content[0]
+
+	// Always enforce the app-private auth-dir on Android
+	setMappingScalar(rootMap, "auth-dir", authDir, "!!str")
+
+	if cfg.Port > 0 && cfg.Port != 8317 {
+		setMappingScalar(rootMap, "port", fmt.Sprintf("%d", cfg.Port), "!!int")
+	} else if findMappingValue(rootMap, "port") == nil {
+		setMappingScalar(rootMap, "port", "8317", "!!int")
+	}
+
+	if strings.TrimSpace(cfg.BindHost) != "" {
+		setMappingScalar(rootMap, "host", strings.TrimSpace(cfg.BindHost), "!!str")
+	} else if findMappingValue(rootMap, "host") == nil {
+		setMappingScalar(rootMap, "host", "0.0.0.0", "!!str")
 	}
 
 	if len(cfg.APIKeys) > 0 {
-		initialData["api-keys"] = cfg.APIKeys
-	} else {
-		initialData["api-keys"] = []string{}
+		setMappingStringSeq(rootMap, "api-keys", cfg.APIKeys)
 	}
 
-	rmMap := initialData["remote-management"].(map[string]any)
-	if cfg.ManagementSecret != "" {
-		rmMap["secret"] = cfg.ManagementSecret
+	rmNode := getOrCreateMapping(rootMap, "remote-management")
+	if cfg.ManagementAllowRemote {
+		setMappingScalar(rmNode, "allow-remote", "true", "!!bool")
 	}
-	if cfg.PanelRepository != "" {
-		rmMap["panel-github-repository"] = cfg.PanelRepository
+	if !cfg.AutoUpdatePanel {
+		setMappingScalar(rmNode, "disable-auto-update-panel", "true", "!!bool")
+	}
+	setMappingScalar(rmNode, "disable-control-panel", "false", "!!bool")
+
+	if strings.TrimSpace(cfg.ManagementSecret) != "" {
+		setMappingScalar(rmNode, "secret-key", strings.TrimSpace(cfg.ManagementSecret), "!!str")
+	}
+	if strings.TrimSpace(cfg.PanelRepository) != "" {
+		setMappingScalar(rmNode, "panel-github-repository", strings.TrimSpace(cfg.PanelRepository), "!!str")
 	}
 
-	out, err := yaml.Marshal(initialData)
-	if err != nil {
+	var buf bytes.Buffer
+	enc := yaml.NewEncoder(&buf)
+	enc.SetIndent(2)
+	if err := enc.Encode(&docNode); err != nil {
 		return fmt.Errorf("failed to marshal initial config: %w", err)
 	}
+	_ = enc.Close()
 
-	return atomicWriteFile(configPath, out)
+	return atomicWriteFile(configPath, buf.Bytes())
 }
 
 // UpdateConfigYAML modifies Android-managed settings in existing config.yaml without wiping rich settings.
@@ -98,45 +133,49 @@ func UpdateConfigYAML(workspaceDir string, cfg BootstrapConfig) error {
 		return fmt.Errorf("failed to read %s: %w", configPath, err)
 	}
 
-	var root map[string]any
-	if err := yaml.Unmarshal(data, &root); err != nil {
+	var docNode yaml.Node
+	if err := yaml.Unmarshal(data, &docNode); err != nil {
 		return fmt.Errorf("failed to parse %s: %w", configPath, err)
 	}
-	if root == nil {
-		root = make(map[string]any)
+
+	if docNode.Kind != yaml.DocumentNode || len(docNode.Content) == 0 || docNode.Content[0].Kind != yaml.MappingNode {
+		return fmt.Errorf("invalid YAML structure in %s", configPath)
+	}
+	rootMap := docNode.Content[0]
+
+	authDir := filepath.Join(workspaceDir, authDirName)
+	setMappingScalar(rootMap, "auth-dir", authDir, "!!str")
+
+	if cfg.Port > 0 {
+		setMappingScalar(rootMap, "port", fmt.Sprintf("%d", cfg.Port), "!!int")
+	}
+	if strings.TrimSpace(cfg.BindHost) != "" {
+		setMappingScalar(rootMap, "host", strings.TrimSpace(cfg.BindHost), "!!str")
 	}
 
-	root["port"] = cfg.Port
-	root["host"] = cfg.BindHost
-	root["auth-dir"] = filepath.Join(workspaceDir, authDirName)
-
-	var rm map[string]any
-	if existingRm, ok := root["remote-management"].(map[string]any); ok && existingRm != nil {
-		rm = existingRm
-	} else {
-		rm = make(map[string]any)
+	rmNode := getOrCreateMapping(rootMap, "remote-management")
+	setMappingScalar(rmNode, "allow-remote", fmt.Sprintf("%t", cfg.ManagementAllowRemote), "!!bool")
+	setMappingScalar(rmNode, "disable-auto-update-panel", fmt.Sprintf("%t", !cfg.AutoUpdatePanel), "!!bool")
+	if strings.TrimSpace(cfg.ManagementSecret) != "" {
+		setMappingScalar(rmNode, "secret-key", strings.TrimSpace(cfg.ManagementSecret), "!!str")
 	}
-
-	rm["allow-remote"] = cfg.ManagementAllowRemote
-	rm["disable-auto-update-panel"] = !cfg.AutoUpdatePanel
-	if cfg.PanelRepository != "" {
-		rm["panel-github-repository"] = cfg.PanelRepository
+	if strings.TrimSpace(cfg.PanelRepository) != "" {
+		setMappingScalar(rmNode, "panel-github-repository", strings.TrimSpace(cfg.PanelRepository), "!!str")
 	}
-	if cfg.ManagementSecret != "" {
-		rm["secret"] = cfg.ManagementSecret
-	}
-	root["remote-management"] = rm
 
 	if len(cfg.APIKeys) > 0 {
-		root["api-keys"] = cfg.APIKeys
+		setMappingStringSeq(rootMap, "api-keys", cfg.APIKeys)
 	}
 
-	out, err := yaml.Marshal(root)
-	if err != nil {
-		return fmt.Errorf("failed to marshal updated config: %w", err)
+	var buf bytes.Buffer
+	enc := yaml.NewEncoder(&buf)
+	enc.SetIndent(2)
+	if err := enc.Encode(&docNode); err != nil {
+		return fmt.Errorf("failed to encode updated config: %w", err)
 	}
+	_ = enc.Close()
 
-	return atomicWriteFile(configPath, out)
+	return atomicWriteFile(configPath, buf.Bytes())
 }
 
 // CountAuthFiles counts the number of JSON credentials present in workspace/auth.
@@ -153,6 +192,70 @@ func CountAuthFiles(workspaceDir string) int {
 		}
 	}
 	return count
+}
+
+func findMappingValue(mapping *yaml.Node, key string) *yaml.Node {
+	if mapping == nil || mapping.Kind != yaml.MappingNode {
+		return nil
+	}
+	for i := 0; i < len(mapping.Content)-1; i += 2 {
+		if mapping.Content[i].Value == key {
+			return mapping.Content[i+1]
+		}
+	}
+	return nil
+}
+
+func setMappingScalar(mapping *yaml.Node, key, val, tag string) {
+	for i := 0; i < len(mapping.Content)-1; i += 2 {
+		if mapping.Content[i].Value == key {
+			mapping.Content[i+1].Value = val
+			mapping.Content[i+1].Tag = tag
+			return
+		}
+	}
+	mapping.Content = append(mapping.Content,
+		&yaml.Node{Kind: yaml.ScalarNode, Tag: "!!str", Value: key},
+		&yaml.Node{Kind: yaml.ScalarNode, Tag: tag, Value: val},
+	)
+}
+
+func setMappingStringSeq(mapping *yaml.Node, key string, items []string) {
+	seqNode := &yaml.Node{Kind: yaml.SequenceNode, Tag: "!!seq"}
+	for _, item := range items {
+		seqNode.Content = append(seqNode.Content, &yaml.Node{
+			Kind:  yaml.ScalarNode,
+			Tag:   "!!str",
+			Value: item,
+		})
+	}
+	for i := 0; i < len(mapping.Content)-1; i += 2 {
+		if mapping.Content[i].Value == key {
+			mapping.Content[i+1] = seqNode
+			return
+		}
+	}
+	mapping.Content = append(mapping.Content,
+		&yaml.Node{Kind: yaml.ScalarNode, Tag: "!!str", Value: key},
+		seqNode,
+	)
+}
+
+func getOrCreateMapping(mapping *yaml.Node, key string) *yaml.Node {
+	for i := 0; i < len(mapping.Content)-1; i += 2 {
+		if mapping.Content[i].Value == key {
+			if mapping.Content[i+1].Kind == yaml.MappingNode {
+				return mapping.Content[i+1]
+			}
+			break
+		}
+	}
+	newMap := &yaml.Node{Kind: yaml.MappingNode, Tag: "!!map"}
+	mapping.Content = append(mapping.Content,
+		&yaml.Node{Kind: yaml.ScalarNode, Tag: "!!str", Value: key},
+		newMap,
+	)
+	return newMap
 }
 
 func atomicWriteFile(targetPath string, content []byte) error {

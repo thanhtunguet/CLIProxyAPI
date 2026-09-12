@@ -108,3 +108,70 @@ func TestCountAuthFiles(t *testing.T) {
 		t.Errorf("expected 2 auth files, got %d", count)
 	}
 }
+
+func TestBootstrapUsesDefaultAndroidConfig(t *testing.T) {
+	tempDir, err := os.MkdirTemp("", "cliproxy-default-cfg-test-*")
+	if err != nil {
+		t.Fatalf("temp dir: %v", err)
+	}
+	defer os.RemoveAll(tempDir)
+
+	// User enables CLIProxy with 0.0.0.0, port 8317, without overriding keys or secret
+	cfg := BootstrapConfig{
+		WorkspaceDir:          tempDir,
+		BindHost:              "0.0.0.0",
+		Port:                  8317,
+		ManagementAllowRemote: true,
+		AutoUpdatePanel:       true,
+	}
+
+	// ValidateConfig must succeed because DefaultConfigYAML provides api-keys and secret-key
+	if err := ValidateConfig(cfg); err != nil {
+		t.Fatalf("ValidateConfig failed with default config: %v", err)
+	}
+
+	if err := BootstrapConfigYAML(tempDir, cfg); err != nil {
+		t.Fatalf("BootstrapConfigYAML: %v", err)
+	}
+
+	configPath := filepath.Join(tempDir, "config.yaml")
+	data, err := os.ReadFile(configPath)
+	if err != nil {
+		t.Fatalf("read config: %v", err)
+	}
+
+	var parsed struct {
+		Host             string   `yaml:"host"`
+		Port             int      `yaml:"port"`
+		AuthDir          string   `yaml:"auth-dir"`
+		APIKeys          []string `yaml:"api-keys"`
+		RemoteManagement struct {
+			AllowRemote bool   `yaml:"allow-remote"`
+			SecretKey   string `yaml:"secret-key"`
+		} `yaml:"remote-management"`
+	}
+
+	if err := yaml.Unmarshal(data, &parsed); err != nil {
+		t.Fatalf("unmarshal yaml: %v", err)
+	}
+
+	if parsed.Host != "0.0.0.0" {
+		t.Errorf("expected host 0.0.0.0, got %s", parsed.Host)
+	}
+	if parsed.Port != 8317 {
+		t.Errorf("expected port 8317, got %d", parsed.Port)
+	}
+	expectedAuthDir := filepath.Join(tempDir, "auth")
+	if parsed.AuthDir != expectedAuthDir {
+		t.Errorf("expected auth-dir %s, got %s", expectedAuthDir, parsed.AuthDir)
+	}
+	if len(parsed.APIKeys) == 0 {
+		t.Error("expected default api-keys to be populated from default_config.yaml")
+	}
+	if parsed.RemoteManagement.SecretKey != "123456a@" {
+		t.Errorf("expected secret-key '123456a@', got %s", parsed.RemoteManagement.SecretKey)
+	}
+	if !parsed.RemoteManagement.AllowRemote {
+		t.Error("expected allow-remote to be true")
+	}
+}

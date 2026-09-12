@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
@@ -34,7 +35,7 @@ type Runtime struct {
 // NewRuntime creates an uninitialized Runtime instance.
 func NewRuntime() *Runtime {
 	return &Runtime{
-		host:       "127.0.0.1",
+		host:       "0.0.0.0",
 		port:       8317,
 		panelState: "offline",
 	}
@@ -54,16 +55,6 @@ func (r *Runtime) Start(ctx context.Context, cfg BootstrapConfig) error {
 		}
 		// Config or port changed; stop previous instance first
 		r.stopLocked()
-	}
-
-	if err := ValidateConfig(cfg); err != nil {
-		r.lastError = err.Error()
-		return err
-	}
-
-	if err := CheckPortAvailable(cfg.BindHost, cfg.Port); err != nil {
-		r.lastError = err.Error()
-		return err
 	}
 
 	if err := EnsureWorkspace(cfg.WorkspaceDir); err != nil {
@@ -90,8 +81,41 @@ func (r *Runtime) Start(ctx context.Context, cfg BootstrapConfig) error {
 	// Canonical app-private auth-dir
 	loadedCfg.AuthDir = filepath.Join(cfg.WorkspaceDir, authDirName)
 
+	effectiveHost := strings.TrimSpace(loadedCfg.Host)
+	if effectiveHost == "" {
+		effectiveHost = "0.0.0.0"
+	}
+	effectivePort := loadedCfg.Port
+	if effectivePort == 0 {
+		effectivePort = 8317
+	}
+
+	effectiveCfg := BootstrapConfig{
+		WorkspaceDir:          cfg.WorkspaceDir,
+		BindHost:              effectiveHost,
+		Port:                  effectivePort,
+		APIKeys:               loadedCfg.APIKeys,
+		ManagementSecret:      loadedCfg.RemoteManagement.SecretKey,
+		ManagementAllowRemote: loadedCfg.RemoteManagement.AllowRemote,
+		PanelRepository:       loadedCfg.RemoteManagement.PanelGitHubRepository,
+		AutoUpdatePanel:       !loadedCfg.RemoteManagement.DisableAutoUpdatePanel,
+	}
+
+	if err := ValidateConfig(effectiveCfg); err != nil {
+		r.lastError = err.Error()
+		return err
+	}
+
+	if err := CheckPortAvailable(effectiveHost, effectivePort); err != nil {
+		r.lastError = err.Error()
+		return err
+	}
+
 	// Bounded logging with redaction
-	secrets := append([]string{}, cfg.APIKeys...)
+	secrets := append([]string{}, loadedCfg.APIKeys...)
+	if loadedCfg.RemoteManagement.SecretKey != "" {
+		secrets = append(secrets, loadedCfg.RemoteManagement.SecretKey)
+	}
 	if cfg.ManagementSecret != "" {
 		secrets = append(secrets, cfg.ManagementSecret)
 	}
@@ -176,8 +200,8 @@ func (r *Runtime) Start(ctx context.Context, cfg BootstrapConfig) error {
 	r.running = true
 	r.desired = true
 	r.workspace = cfg.WorkspaceDir
-	r.host = cfg.BindHost
-	r.port = cfg.Port
+	r.host = effectiveHost
+	r.port = effectivePort
 	r.lastError = ""
 	r.transitionTime = time.Now().UnixMilli()
 	r.panelState = GetPanelState(staticDir)
