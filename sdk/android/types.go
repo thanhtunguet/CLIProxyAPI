@@ -7,6 +7,7 @@ type BootstrapConfig struct {
 	BindHost              string   `json:"bindHost"`
 	Port                  int      `json:"port"`
 	APIKeys               []string `json:"apiKeys"`
+	TrustedProxies        []string `json:"trustedProxies"`
 	ManagementSecret      string   `json:"managementSecret"`
 	ManagementAllowRemote bool     `json:"managementAllowRemote"`
 	PanelRepository       string   `json:"panelRepository"`

@@ -94,6 +94,7 @@ func BootstrapConfigYAML(workspaceDir string, cfg BootstrapConfig) error {
 	if len(cfg.APIKeys) > 0 {
 		setMappingStringSeq(rootMap, "api-keys", cfg.APIKeys)
 	}
+	setMappingStringSeq(rootMap, "trusted-proxies", cfg.TrustedProxies)
 
 	rmNode := getOrCreateMapping(rootMap, "remote-management")
 	if cfg.ManagementAllowRemote {
@@ -166,6 +167,7 @@ func UpdateConfigYAML(workspaceDir string, cfg BootstrapConfig) error {
 	if len(cfg.APIKeys) > 0 {
 		setMappingStringSeq(rootMap, "api-keys", cfg.APIKeys)
 	}
+	setMappingStringSeq(rootMap, "trusted-proxies", cfg.TrustedProxies)
 
 	var buf bytes.Buffer
 	enc := yaml.NewEncoder(&buf)
