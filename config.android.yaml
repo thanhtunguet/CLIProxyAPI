@@ -56,13 +56,6 @@ pprof:
   enable: false
   addr: "127.0.0.1:8316"
 
-trusted-proxies:
-  - "127.0.0.1"
-  - "::1"
-  - "10.0.0.0/8"
-  - "172.16.0.0/12"
-  - "192.168.0.0/16"
-
 # Credential concurrency is configured by Home in Home mode. The synthesized Home config is
 # authoritative and local values, including the values below, are ignored. Do not use local
 # configuration to override a Home concurrency policy.

@@ -72,6 +72,17 @@ func (r *Runtime) Start(ctx context.Context, cfg BootstrapConfig) error {
 	_ = os.Setenv("MANAGEMENT_STATIC_PATH", filepath.Join(staticDir, managementasset.ManagementFileName))
 
 	configPath := filepath.Join(cfg.WorkspaceDir, configFileName)
+	// Keep the on-disk management secret aligned with the value the Android app
+	// hands to both CLIProxyAPI and the CPA Usage Keeper. LoadConfig hashes the
+	// plaintext and rewrites the file, so without this step a secret configured
+	// in the app after the first launch never reaches an existing config.yaml.
+	// The Keeper would then authenticate with a key the server rejects, and its
+	// polling would trip the server's failed-attempt IP ban.
+	if secret := strings.TrimSpace(cfg.ManagementSecret); secret != "" {
+		if errSecret := config.SaveConfigPreserveCommentsUpdateNestedScalar(configPath, []string{"remote-management", "secret-key"}, secret); errSecret != nil {
+			log.WithError(errSecret).Warn("failed to persist management secret to config.yaml")
+		}
+	}
 	loadedCfg, err := config.LoadConfig(configPath)
 	if err != nil {
 		r.lastError = fmt.Sprintf("load config: %v", err)
