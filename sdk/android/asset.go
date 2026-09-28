@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/router-for-me/CLIProxyAPI/v7/internal/managementasset"
+	"github.com/router-for-me/CLIProxyAPI/v8/internal/managementasset"
 )
 
 const bundledOfflineHTML = `<!DOCTYPE html>
