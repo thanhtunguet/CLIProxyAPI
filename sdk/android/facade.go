@@ -12,6 +12,7 @@ import (
 
 	"github.com/router-for-me/CLIProxyAPI/v8/internal/config"
 	"github.com/router-for-me/CLIProxyAPI/v8/internal/managementasset"
+	sdkapi "github.com/router-for-me/CLIProxyAPI/v8/sdk/api"
 	"github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy"
 	log "github.com/sirupsen/logrus"
 )
@@ -140,6 +141,9 @@ func (r *Runtime) Start(ctx context.Context, cfg BootstrapConfig) error {
 	builder := cliproxy.NewBuilder().
 		WithConfig(loadedCfg).
 		WithConfigPath(configPath).
+		// On Android the root URL redirects to the management panel instead of
+		// returning the default JSON status payload.
+		WithServerOptions(sdkapi.WithMiddleware(rootRedirectMiddleware())).
 		WithListenerReady(func() {
 			select {
 			case readyCh <- struct{}{}:
