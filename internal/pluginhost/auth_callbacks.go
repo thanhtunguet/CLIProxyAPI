@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/MoeForge/moego/json"
+	"github.com/router-for-me/CLIProxyAPI/v8/internal/misc"
 	"github.com/router-for-me/CLIProxyAPI/v8/internal/registry"
 	coreauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
 	"github.com/router-for-me/CLIProxyAPI/v8/sdk/pluginapi"
@@ -254,7 +255,7 @@ func (h *Host) listAuthFilesFromDisk() ([]pluginapi.HostAuthFileEntry, error) {
 		}
 		if data, errRead := os.ReadFile(full); errRead == nil {
 			var metadata map[string]any
-			if errUnmarshal := json.Unmarshal(data, &metadata); errUnmarshal == nil {
+			if errUnmarshal := misc.UnmarshalAuthFile(data, &metadata); errUnmarshal == nil {
 				if provider, ok := metadata["type"].(string); ok {
 					fileEntry.Type = strings.TrimSpace(provider)
 					fileEntry.Provider = fileEntry.Type
@@ -336,7 +337,7 @@ func (h *Host) authPhysicalJSONByIndex(authIndex string) (*coreauth.Auth, []byte
 		return nil, nil, fmt.Errorf("auth file is empty for auth_index %s", authIndex)
 	}
 	var metadata map[string]any
-	if errUnmarshal := json.Unmarshal(data, &metadata); errUnmarshal != nil {
+	if errUnmarshal := misc.UnmarshalAuthFile(data, &metadata); errUnmarshal != nil {
 		return nil, nil, fmt.Errorf("invalid auth file for auth_index %s: %w", authIndex, errUnmarshal)
 	}
 	return auth, data, nil
@@ -355,7 +356,7 @@ func validateHostAuthSaveRequest(req pluginapi.HostAuthSaveRequest) (string, []b
 		return "", nil, fmt.Errorf("json is required")
 	}
 	var metadata map[string]any
-	if errUnmarshal := json.Unmarshal(rawJSON, &metadata); errUnmarshal != nil {
+	if errUnmarshal := misc.UnmarshalAuthFile(rawJSON, &metadata); errUnmarshal != nil {
 		return "", nil, fmt.Errorf("invalid auth json: %w", errUnmarshal)
 	}
 	return filepath.Base(name), rawJSON, nil
@@ -397,7 +398,7 @@ func (h *Host) buildAuthsFromFileData(ctx context.Context, path string, data []b
 		}
 	}
 	metadata := make(map[string]any)
-	if errUnmarshal := json.Unmarshal(data, &metadata); errUnmarshal != nil {
+	if errUnmarshal := misc.UnmarshalAuthFile(data, &metadata); errUnmarshal != nil {
 		return nil, fmt.Errorf("invalid auth file: %w", errUnmarshal)
 	}
 	coreauth.NormalizeCredentialMetadata(metadata)

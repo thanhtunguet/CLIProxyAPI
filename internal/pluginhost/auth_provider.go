@@ -14,6 +14,7 @@ import (
 	"github.com/MoeForge/moego/json"
 	"github.com/MoeForge/moego/ojson"
 	"github.com/router-for-me/CLIProxyAPI/v8/internal/config"
+	"github.com/router-for-me/CLIProxyAPI/v8/internal/misc"
 	coreauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
 	"github.com/router-for-me/CLIProxyAPI/v8/sdk/pluginapi"
 )
@@ -1209,7 +1210,7 @@ func (s *pluginTokenStorage) SetMetadata(meta map[string]any) {
 	if _, hadPriority := s.meta["priority"]; hadPriority {
 		if _, hasPriority := meta["priority"]; !hasPriority {
 			var raw map[string]any
-			if errUnmarshal := json.Unmarshal(s.rawJSON, &raw); errUnmarshal == nil {
+			if errUnmarshal := misc.UnmarshalAuthFile(s.rawJSON, &raw); errUnmarshal == nil {
 				delete(raw, "priority")
 				if cleaned, errMarshal := json.Marshal(raw); errMarshal == nil {
 					s.rawJSON = cleaned
@@ -1261,11 +1262,11 @@ func pluginTokenStorageFileCurrent(path string, payload []byte) bool {
 
 func jsonPayloadEqual(left, right []byte) bool {
 	var leftValue any
-	if errUnmarshalLeft := json.Unmarshal(left, &leftValue); errUnmarshalLeft != nil {
+	if errUnmarshalLeft := misc.UnmarshalAuthFile(left, &leftValue); errUnmarshalLeft != nil {
 		return false
 	}
 	var rightValue any
-	if errUnmarshalRight := json.Unmarshal(right, &rightValue); errUnmarshalRight != nil {
+	if errUnmarshalRight := misc.UnmarshalAuthFile(right, &rightValue); errUnmarshalRight != nil {
 		return false
 	}
 	return reflect.DeepEqual(leftValue, rightValue)
@@ -1274,7 +1275,7 @@ func jsonPayloadEqual(left, right []byte) bool {
 func mergedStorageJSON(raw []byte, metadata map[string]any, provider string) ([]byte, error) {
 	out := make(map[string]any)
 	if len(bytes.TrimSpace(raw)) > 0 {
-		if errUnmarshal := json.Unmarshal(raw, &out); errUnmarshal != nil {
+		if errUnmarshal := misc.UnmarshalAuthFile(raw, &out); errUnmarshal != nil {
 			return nil, fmt.Errorf("decode plugin token storage: %w", errUnmarshal)
 		}
 		if out == nil {

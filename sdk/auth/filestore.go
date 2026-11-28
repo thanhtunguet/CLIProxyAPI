@@ -231,7 +231,7 @@ func (s *FileTokenStore) readAuthFiles(path, baseDir string) ([]*cliproxyauth.Au
 		return nil, nil
 	}
 	metadata := make(map[string]any)
-	if err = json.Unmarshal(data, &metadata); err != nil {
+	if err = misc.UnmarshalAuthFile(data, &metadata); err != nil {
 		return nil, fmt.Errorf("unmarshal auth json: %w", err)
 	}
 	cliproxyauth.NormalizeCredentialMetadata(metadata)
@@ -482,10 +482,10 @@ func extractAccessToken(metadata map[string]any) string {
 func jsonEqual(a, b []byte) bool {
 	var objA any
 	var objB any
-	if err := json.Unmarshal(a, &objA); err != nil {
+	if err := misc.UnmarshalAuthFile(a, &objA); err != nil {
 		return false
 	}
-	if err := json.Unmarshal(b, &objB); err != nil {
+	if err := misc.UnmarshalAuthFile(b, &objB); err != nil {
 		return false
 	}
 	return deepEqualJSON(objA, objB)

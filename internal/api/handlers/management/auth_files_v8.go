@@ -13,6 +13,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/router-for-me/CLIProxyAPI/v8/internal/auth/kimi"
 	"github.com/router-for-me/CLIProxyAPI/v8/internal/clienterror"
+	"github.com/router-for-me/CLIProxyAPI/v8/internal/misc"
 	coreauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
 	"github.com/router-for-me/CLIProxyAPI/v8/sdk/proxyutil"
 )
@@ -350,7 +351,7 @@ func (h *Handler) StartOAuthV8(c *gin.Context) {
 		if diskPath != "" {
 			if raw, errRead := os.ReadFile(diskPath); errRead == nil && len(raw) > 0 {
 				var diskMeta map[string]any
-				if json.Unmarshal(raw, &diskMeta) == nil && len(diskMeta) > 0 {
+				if misc.UnmarshalAuthFile(raw, &diskMeta) == nil && len(diskMeta) > 0 {
 					mergedMeta := make(map[string]any, len(diskMeta)+len(targetAuth.Metadata))
 					for k, v := range diskMeta {
 						mergedMeta[k] = v

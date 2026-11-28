@@ -21,6 +21,7 @@ import (
 	"github.com/router-for-me/CLIProxyAPI/v8/internal/auth/codex"
 	"github.com/router-for-me/CLIProxyAPI/v8/internal/clienterror"
 	"github.com/router-for-me/CLIProxyAPI/v8/internal/config"
+	"github.com/router-for-me/CLIProxyAPI/v8/internal/misc"
 	"github.com/router-for-me/CLIProxyAPI/v8/internal/registry"
 	"github.com/router-for-me/CLIProxyAPI/v8/internal/util"
 	"github.com/router-for-me/CLIProxyAPI/v8/internal/watcher/synthesizer"
@@ -689,7 +690,7 @@ func (h *Handler) buildAuthFromFileData(path string, data []byte) (*coreauth.Aut
 		}
 	}
 	metadata := make(map[string]any)
-	if err := json.Unmarshal(data, &metadata); err != nil {
+	if err := misc.UnmarshalAuthFile(data, &metadata); err != nil {
 		return nil, fmt.Errorf("%w: %w", errInvalidAuthFile, err)
 	}
 	coreauth.NormalizeCredentialMetadata(metadata)

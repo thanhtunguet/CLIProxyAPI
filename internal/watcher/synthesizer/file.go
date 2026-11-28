@@ -15,6 +15,7 @@ import (
 	"github.com/router-for-me/CLIProxyAPI/v8/internal/auth/codex"
 	kimiauth "github.com/router-for-me/CLIProxyAPI/v8/internal/auth/kimi"
 	"github.com/router-for-me/CLIProxyAPI/v8/internal/config"
+	"github.com/router-for-me/CLIProxyAPI/v8/internal/misc"
 	coreauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
 	"github.com/router-for-me/CLIProxyAPI/v8/sdk/pluginapi"
 	log "github.com/sirupsen/logrus"
@@ -97,7 +98,7 @@ func synthesizeFileAuths(ctx *SynthesisContext, fullPath string, data []byte) ([
 	}
 	now := ctx.Now
 	var metadata map[string]any
-	if errUnmarshal := json.Unmarshal(data, &metadata); errUnmarshal != nil {
+	if errUnmarshal := misc.UnmarshalAuthFile(data, &metadata); errUnmarshal != nil {
 		if ctx.StrictFileParsing {
 			return nil, false, fmt.Errorf("parse auth file: %w", errUnmarshal)
 		}

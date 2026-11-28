@@ -7,10 +7,10 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/MoeForge/moego/json"
 	claudeauth "github.com/router-for-me/CLIProxyAPI/v8/internal/auth/claude"
 	xaiauth "github.com/router-for-me/CLIProxyAPI/v8/internal/auth/xai"
 	"github.com/router-for-me/CLIProxyAPI/v8/internal/config"
+	"github.com/router-for-me/CLIProxyAPI/v8/internal/misc"
 	coreauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
 	"github.com/router-for-me/CLIProxyAPI/v8/sdk/proxyutil"
 )
@@ -93,7 +93,7 @@ func (m *Manager) Login(ctx context.Context, provider string, cfg *config.Config
 				fullPath := filepath.Join(cfg.AuthDir, targetFile)
 				if raw, errRead := os.ReadFile(fullPath); errRead == nil && len(raw) > 0 {
 					var existingMap map[string]any
-					if errUnmarshal := json.Unmarshal(raw, &existingMap); errUnmarshal == nil && len(existingMap) > 0 {
+					if errUnmarshal := misc.UnmarshalAuthFile(raw, &existingMap); errUnmarshal == nil && len(existingMap) > 0 {
 						coreauth.MergeExistingAuthMetadata(record, existingMap)
 					}
 				}

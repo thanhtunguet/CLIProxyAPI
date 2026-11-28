@@ -293,7 +293,7 @@ func (ts *CodexTokenStorage) SaveTokenToFile(authFilePath string) error {
 		}
 		if errRead == nil {
 			var diskMap map[string]any
-			if errUnmarshal := json.Unmarshal(existingBytes, &diskMap); errUnmarshal != nil || diskMap == nil {
+			if errUnmarshal := misc.UnmarshalAuthFile(existingBytes, &diskMap); errUnmarshal != nil || diskMap == nil {
 				return fmt.Errorf("invalid existing credential JSON")
 			}
 			if ts.RefreshPatch != nil {

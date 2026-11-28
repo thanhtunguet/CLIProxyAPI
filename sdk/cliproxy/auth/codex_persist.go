@@ -8,6 +8,7 @@ import (
 
 	"github.com/MoeForge/moego/json"
 	"github.com/router-for-me/CLIProxyAPI/v8/internal/auth/codex"
+	"github.com/router-for-me/CLIProxyAPI/v8/internal/misc"
 )
 
 // IsCodexAuthRecord reports whether auth represents a Codex credential record.
@@ -57,7 +58,7 @@ func PersistCodexAuthFile(ctx context.Context, path string, auth *Auth) (bool, e
 				return fmt.Errorf("auth filestore: read refresh source failed: %w", errRead)
 			}
 			var diskMap map[string]any
-			if errUnmarshal := json.Unmarshal(existing, &diskMap); errUnmarshal != nil || diskMap == nil {
+			if errUnmarshal := misc.UnmarshalAuthFile(existing, &diskMap); errUnmarshal != nil || diskMap == nil {
 				return fmt.Errorf("auth filestore: invalid refresh source JSON")
 			}
 			merged := auth.CodexRefreshPatch.Apply(diskMap)
@@ -96,7 +97,7 @@ func PersistCodexAuthFile(ctx context.Context, path string, auth *Auth) (bool, e
 		}
 		if persistedBytes, errReadPersisted := os.ReadFile(path); errReadPersisted == nil && len(persistedBytes) > 0 {
 			var diskMap map[string]any
-			if errUnmarshal := json.Unmarshal(persistedBytes, &diskMap); errUnmarshal == nil && len(diskMap) > 0 {
+			if errUnmarshal := misc.UnmarshalAuthFile(persistedBytes, &diskMap); errUnmarshal == nil && len(diskMap) > 0 {
 				auth.Metadata = codex.MergeCodexCredentialsFromDisk(diskMap, auth.Metadata)
 				NormalizeCredentialMetadata(auth.Metadata)
 			}
@@ -109,7 +110,7 @@ func PersistCodexAuthFile(ctx context.Context, path string, auth *Auth) (bool, e
 			existing, errRead := os.ReadFile(path)
 			if errRead == nil && len(existing) > 0 {
 				var diskMap map[string]any
-				if errUnmarshal := json.Unmarshal(existing, &diskMap); errUnmarshal == nil && len(diskMap) > 0 {
+				if errUnmarshal := misc.UnmarshalAuthFile(existing, &diskMap); errUnmarshal == nil && len(diskMap) > 0 {
 					if !HasAuthCreationIntent(ctx) {
 						auth.Metadata = codex.MergeCodexCredentialsFromDisk(diskMap, auth.Metadata)
 					}

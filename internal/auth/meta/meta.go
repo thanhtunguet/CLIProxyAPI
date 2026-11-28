@@ -18,6 +18,7 @@ import (
 
 	"github.com/MoeForge/moego/json"
 	"github.com/router-for-me/CLIProxyAPI/v8/internal/config"
+	"github.com/router-for-me/CLIProxyAPI/v8/internal/misc"
 	"github.com/router-for-me/CLIProxyAPI/v8/internal/util"
 	log "github.com/sirupsen/logrus"
 )
@@ -178,7 +179,7 @@ func (ts *MetaTokenStorage) SaveTokenToFile(authFilePath string) error {
 	metadata := ts.Metadata
 	if metadata == nil {
 		if raw, errRead := os.ReadFile(authFilePath); errRead == nil {
-			_ = json.Unmarshal(raw, &metadata)
+			_ = misc.UnmarshalAuthFile(raw, &metadata)
 		}
 	}
 	for k, v := range metadata {

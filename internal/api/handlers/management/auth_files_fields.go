@@ -20,6 +20,7 @@ import (
 	xaiauth "github.com/router-for-me/CLIProxyAPI/v8/internal/auth/xai"
 	"github.com/router-for-me/CLIProxyAPI/v8/internal/clienterror"
 	"github.com/router-for-me/CLIProxyAPI/v8/internal/credentialweight"
+	"github.com/router-for-me/CLIProxyAPI/v8/internal/misc"
 	"github.com/router-for-me/CLIProxyAPI/v8/internal/watcher/synthesizer"
 	sdkAuth "github.com/router-for-me/CLIProxyAPI/v8/sdk/auth"
 	coreauth "github.com/router-for-me/CLIProxyAPI/v8/sdk/cliproxy/auth"
@@ -221,7 +222,7 @@ func setSourceAuthFileDisabled(path string, disabled bool) error {
 	}
 	metadata := make(map[string]any)
 	if len(bytes.TrimSpace(data)) > 0 {
-		if errUnmarshal := json.Unmarshal(data, &metadata); errUnmarshal != nil {
+		if errUnmarshal := misc.UnmarshalAuthFile(data, &metadata); errUnmarshal != nil {
 			return fmt.Errorf("invalid auth file: %w", errUnmarshal)
 		}
 	}
@@ -987,7 +988,7 @@ func (h *Handler) mergeExistingAuthFileMetadata(record *coreauth.Auth) {
 		}
 		if fullPath != "" {
 			if raw, errRead := os.ReadFile(fullPath); errRead == nil && len(raw) > 0 {
-				_ = json.Unmarshal(raw, &existingMap)
+				_ = misc.UnmarshalAuthFile(raw, &existingMap)
 			}
 		}
 	}
